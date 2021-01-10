@@ -8,9 +8,50 @@ var GLOBAL_IS_FETCHING = false;
 var GLOBAL_FRAME_QUEUE = null;
 
 class JPEG_Frame {
+    constructor(encoded, frame) {
+        this.b64 = encoded;
+        this.frameid = frame;
+        this.img = null;
+    }
+    get GetFrame() {
+        if (this.img === null) {
+            this.img = new Image();
+            this.img.src = "data:image/jpg;base64," + this.b4;
+        }
+        return this.img;
+    }
+    get IsValid() {
+        if (this.img === null) {
+            return false;
+        }
+        return true;
+    }
+}
+
+class Stream_Queue {
     constructor() {
-        this.b64 = "";
-        this.frameid = -1;
+        this.q = [];
+        this.cur_frame = 0;
+    }
+    GetNextFrame() {
+        if ((this.cur_frame + 1) < this.q.length) {
+            this.cur_frame++;
+            return this.q[this.cur_frame];
+        }
+        return null;
+    }
+    SeekFrame(frameID) {
+        if (frameID < this.q.length) {
+            this.cur_frame = frameID;
+            return this.q[this.cur_frame];
+        }
+        return null;
+    }
+    AddFrame(frame) {
+        this.q.push(frame);
+    }
+    get GetStreamStats() {
+        return null;
     }
 }
 
