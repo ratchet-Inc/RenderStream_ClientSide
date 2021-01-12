@@ -3,7 +3,7 @@
 
 //const TICK_INTERVAL = 0.0334;  // milliseconds, frame time, approx: 30fps
 const TICK_INTERVAL = 34;
-const URL_SERVER_STREAM = "";
+const URL_SERVER_STREAM = "fetchframe.php";
 var GLOBAL_INTERVAL_HANDLE = null;
 var GLOBAL_IS_FETCHING = false;
 var GLOBAL_FRAME_QUEUE = null;
@@ -19,7 +19,7 @@ class JPEG_Frame {
     get GetFrame() {
         if (this.img === null) {
             this.img = new Image();
-            this.img.src = "data:image/jpg;base64," + this.b4;
+            this.img.src = "data:image/jpg;base64," + this.b64;
         }
         return this.img;
     }
@@ -99,18 +99,20 @@ function DrawFrame() {
     var ctx = RenderingCanvas[1];
     var img = GLOBAL_FRAME_QUEUE.GetNextFrame();
     if (img === null) {
-        //console.log("buffering...");
         DrawBuffering();
         return 0;
     }
     DrawBuffering(false);
-    ctx.drawImage(img);
+    var center1 = img.GetFrame.width / 2;
+    var center2 = img.GetFrame.height / 2;
+    ctx.drawImage(img.GetFrame, -center1, -center2);
+    RenderingCanvas[1].save();
 
     return 0;
 }
 
 function CB_FetchFrame_Pass(resp) {
-    if (res.status !== 200) {
+    if (resp.status !== 200) {
         console.log(`Frame error: ${resp.msg}\n`);
         return 1;
     }
@@ -118,18 +120,23 @@ function CB_FetchFrame_Pass(resp) {
         console.log(`Frame queue is null.\n`);
         return 1;
     }
-    if (resp.res.length === 0) {
+    if (resp.res === undefined || resp.res.length === 0) {
         console.log("buffering...");
         DrawBuffering();
         return 1;
     }
     // frames might be shipped out of order, lets resolve that.
-    resp.res.sort((a, b) => a - b);
+    resp.res.sort((a, b) => a.seq - b.seq);
+    if (resp.res[resp.res.length - 1].frm !== "END FRAME") {
+        console.log("incomplete frame found.");
+        return 1;
+    }
     var frame = "";
-    for (var i = 0; i < resp.res.length; i++) {
+    for (var i = 0; i < resp.res.length - 1; i++) {
         frame += resp.res[i].frm;
     }
-    GLOBAL_FRAME_QUEUE.push(new JPEG_Frame(frame, resp.res[0]['_']));
+    GLOBAL_FRAME_QUEUE.AddFrame(new JPEG_Frame(frame, resp.res[0]['_']));
+    console.log("last frame: " + resp.res[0]['_']);
 
     return 0;
 }
@@ -143,7 +150,7 @@ function FetchFrame() {
         return 1;
     }
     GLOBAL_IS_FETCHING = true;
-    JQuery.ajax({
+    jQuery.ajax({
         url: URL_SERVER_STREAM,
         method: 'POST',
         data: {"p": "none"},
@@ -161,7 +168,7 @@ function FetchFrame() {
 }
 
 function CB_RenderStreamLoop() {
-    //FetchFrame();
+    FetchFrame();
     DrawFrame();
     return 0;
 }
