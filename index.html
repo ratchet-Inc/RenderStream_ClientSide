@@ -4,11 +4,14 @@
 <head>
     <meta charset="utf-8" />
     <title>RenderStream Test</title>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
     <script src="renderStreamScript.js"></script>
 </head>
 <body>
     <div class="renderDiv">
         <p>Stream canvas</p>
+        <img id="bufferingImage" src="resources/buffering.png" hidden/>
+        <canvas id="renderingCanvas" height="480" width="800" style="border:1px solid #000000;"></canvas>
     </div>
 </body>
 </html>

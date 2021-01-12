@@ -1,11 +1,14 @@
 // JavaScript source code
 "use strict";
 
-const TICK_INTERVAL = 0.0334;  // milliseconds, frame time, approx: 30fps
+//const TICK_INTERVAL = 0.0334;  // milliseconds, frame time, approx: 30fps
+const TICK_INTERVAL = 34;
 const URL_SERVER_STREAM = "";
 var GLOBAL_INTERVAL_HANDLE = null;
 var GLOBAL_IS_FETCHING = false;
 var GLOBAL_FRAME_QUEUE = null;
+// index 0: canvas element, index 1: canvas context, index 2: buffering data storage
+var RenderingCanvas = [null, null, { rot: 0, imgSrc: null }];
 
 class JPEG_Frame {
     constructor(encoded, frame) {
@@ -55,19 +58,84 @@ class Stream_Queue {
     }
 }
 
-function DrawFrame() {
+function DrawBuffering(show = true) {
+    if (show === false) {
+        RenderingCanvas[2].rot = 0;
+        RenderingCanvas[1].restore();
+        return 0;
+    }
+    const imageName = "bufferingImage";
+    if (RenderingCanvas[2].imgSrc === null) {
+        RenderingCanvas[2].imgSrc = document.getElementById(imageName);
+    }
+    var rot = RenderingCanvas[2].rot * Math.PI / 180;
+    RenderingCanvas[1].rotate(rot);
+    var center1 = RenderingCanvas[2].imgSrc.width / 2;
+    var center2 = RenderingCanvas[2].imgSrc.height / 2;
+    RenderingCanvas[1].drawImage(RenderingCanvas[2].imgSrc, -center1, -center2);
+    RenderingCanvas[2].rot += 1;
+    if (RenderingCanvas[2].rot > 12) {
+        RenderingCanvas[2].rot = RenderingCanvas[2].rot - 4;
+    }
 
+    return 0;
 }
 
-function CB_FetchFrame_Pass(res) {
-    if (res.status !== 200) {
+function DrawFrame() {
+    if (RenderingCanvas[0] === null) {
+        console.log("Canvas pointer is null.");
         return 1;
     }
+    if (GLOBAL_FRAME_QUEUE === null) {
+        console.log("frame queue is null.");
+        return 1;
+    }
+    if (RenderingCanvas[1] === null) {
+        RenderingCanvas[1] = RenderingCanvas[0].getContext("2d");
+        RenderingCanvas[1].fillRect(0, 0, 800, 480);
+        RenderingCanvas[1].translate(RenderingCanvas[0].width / 2, RenderingCanvas[0].height / 2);
+        RenderingCanvas[1].save();
+    }
+    var ctx = RenderingCanvas[1];
+    var img = GLOBAL_FRAME_QUEUE.GetNextFrame();
+    if (img === null) {
+        //console.log("buffering...");
+        DrawBuffering();
+        return 0;
+    }
+    DrawBuffering(false);
+    ctx.drawImage(img);
+
+    return 0;
+}
+
+function CB_FetchFrame_Pass(resp) {
+    if (res.status !== 200) {
+        console.log(`Frame error: ${resp.msg}\n`);
+        return 1;
+    }
+    if (GLOBAL_FRAME_QUEUE === null) {
+        console.log(`Frame queue is null.\n`);
+        return 1;
+    }
+    if (resp.res.length === 0) {
+        console.log("buffering...");
+        DrawBuffering();
+        return 1;
+    }
+    // frames might be shipped out of order, lets resolve that.
+    resp.res.sort((a, b) => a - b);
+    var frame = "";
+    for (var i = 0; i < resp.res.length; i++) {
+        frame += resp.res[i].frm;
+    }
+    GLOBAL_FRAME_QUEUE.push(new JPEG_Frame(frame, resp.res[0]['_']));
+
     return 0;
 }
 
 function CB_FetchFrame_Fail(err) {
-    console.log(`Error on frame fetch:\n ${err.responseText}`);
+    console.log(`Error on frame fetch: ${err.responseText}\n`);
 }
 
 function FetchFrame() {
@@ -78,7 +146,7 @@ function FetchFrame() {
     JQuery.ajax({
         url: URL_SERVER_STREAM,
         method: 'POST',
-        data = '{}',
+        data: {"p": "none"},
         dataType: 'JSON',
         success: function (res) {
             GLOBAL_IS_FETCHING = false;
@@ -93,14 +161,17 @@ function FetchFrame() {
 }
 
 function CB_RenderStreamLoop() {
-    console.log("stream running.");
+    //FetchFrame();
+    DrawFrame();
     return 0;
 }
 
 function main(ev) {
     console.log("Stream script started.");
+    RenderingCanvas[0] = document.getElementById("renderingCanvas");
+    GLOBAL_FRAME_QUEUE = new Stream_Queue();
     // starting to ticking loop
-    //GLOBAL_INTERVAL_HANDLE = setInterval(CB_RenderStreamLoop, TICK_INTERVAL);
+    GLOBAL_INTERVAL_HANDLE = setInterval(CB_RenderStreamLoop, TICK_INTERVAL);
     return 0;
 }
 
