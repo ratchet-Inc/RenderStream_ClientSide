@@ -135,7 +135,6 @@ function CB_FetchFrame_Pass(resp) {
     var frameCount = 0;
     for (var i = 0; i < resp.res.length; i++) {
         if (resp.res[i].frm === FRAME_END_FLAG) {
-            frameCount = 0;
             if (frameCount !== resp.res[i].seg) {
                 console.log("incomplete frame found.");
                 var temp = GLOBAL_FRAME_QUEUE.GetNextFrame();
@@ -143,10 +142,12 @@ function CB_FetchFrame_Pass(resp) {
                     // requeuing the frame so it appears at a stutter
                     GLOBAL_FRAME_QUEUE.AddFrame(temp);
                 }
+                frameCount = 0;
                 frame = "";
                 continue;
             }
             GLOBAL_FRAME_QUEUE.AddFrame(new JPEG_Frame(frame, resp.res[i]['_']));
+            frameCount = 0;
             frame = "";
             continue;
         }
