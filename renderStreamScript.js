@@ -55,6 +55,9 @@ class Stream_Queue {
     AddFrame(frame) {
         this.q.push(frame);
     }
+    get GetLastFrame() {
+        return this.q[this.q.length - 1]["_"];
+    }
     get GetStreamStats() {
         return null;
     }
@@ -146,7 +149,12 @@ function CB_FetchFrame_Pass(resp) {
                 frame = "";
                 continue;
             }
-            GLOBAL_FRAME_QUEUE.AddFrame(new JPEG_Frame(frame, resp.res[i]['_']));
+            // a safegaurd against placing old frames into the queue.
+            // it would be more efficient to skip the entire frame
+            // parsing procedure instead of adding this hotfix
+            if (resp.res[i]['_'] > GLOBAL_FRAME_QUEUE.GetLastFrame) {
+                GLOBAL_FRAME_QUEUE.AddFrame(new JPEG_Frame(frame, resp.res[i]['_']));
+            }
             frameCount = 0;
             frame = "";
             continue;
