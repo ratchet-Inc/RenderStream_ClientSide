@@ -124,7 +124,7 @@ function CB_FetchFrame_Pass(resp) {
     }
     if (resp.res === undefined || resp.res.length === 0) {
         console.log("buffering...");
-        DrawBuffering();
+        /*DrawBuffering();*/
         return 1;
     }
     // frames might be shipped out of order, lets resolve that.
