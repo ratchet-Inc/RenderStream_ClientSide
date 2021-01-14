@@ -4,6 +4,8 @@
 //const TICK_INTERVAL = 0.0334;  // milliseconds, frame time, approx: 30fps
 const TICK_INTERVAL = 34;
 const URL_SERVER_STREAM = "fetchframe.php";
+const FRAME_END_FLAG = "END FRAME";
+var GLOBAL_STOP_STREAM_FLAG = false;
 var GLOBAL_INTERVAL_HANDLE = null;
 var GLOBAL_IS_FETCHING = false;
 var GLOBAL_FRAME_QUEUE = null;
@@ -126,17 +128,31 @@ function CB_FetchFrame_Pass(resp) {
         return 1;
     }
     // frames might be shipped out of order, lets resolve that.
-    resp.res.sort((a, b) => a.seq - b.seq);
-    if (resp.res[resp.res.length - 1].frm !== "END FRAME") {
-        console.log("incomplete frame found.");
-        return 1;
-    }
+    // sorting twice to arrange each frame and all its segments are in order.
+    resp.res.sort((a, b) => a.seg - b.seg);
+    resp.res.sort((a, b) => a["_"] - b["_"]);
     var frame = "";
-    for (var i = 0; i < resp.res.length - 1; i++) {
+    var frameCount = 0;
+    for (var i = 0; i < resp.res.length; i++) {
+        if (resp.res[i].frm === FRAME_END_FLAG) {
+            frameCount = 0;
+            if (frameCount !== resp.res[i].seg) {
+                console.log("incomplete frame found.");
+                var temp = GLOBAL_FRAME_QUEUE.GetNextFrame();
+                if (temp !== null) {
+                    // requeuing the frame so it appears at a stutter
+                    GLOBAL_FRAME_QUEUE.AddFrame(temp);
+                }
+                frame = "";
+                continue;
+            }
+            GLOBAL_FRAME_QUEUE.AddFrame(new JPEG_Frame(frame, resp.res[i]['_']));
+            frame = "";
+            continue;
+        }
+        frameCount++;
         frame += resp.res[i].frm;
     }
-    GLOBAL_FRAME_QUEUE.AddFrame(new JPEG_Frame(frame, resp.res[0]['_']));
-    console.log("last frame: " + resp.res[0]['_']);
 
     return 0;
 }
@@ -146,6 +162,9 @@ function CB_FetchFrame_Fail(err) {
 }
 
 function FetchFrame() {
+    if (GLOBAL_STOP_STREAM_FLAG === true) {
+        return 0;
+    }
     if (GLOBAL_IS_FETCHING) {
         return 1;
     }
@@ -184,6 +203,16 @@ function main(ev) {
 
 document.addEventListener("DOMContentLoaded", function (ev) {
     main(ev);
+    window.addEventListener("beforeunload", function (e) {
+        GLOBAL_STOP_STREAM_FLAG = true;
+        var seconds = new Date().getTime();
+        while (GLOBAL_IS_FETCHING) {
+            var cur = new Date().getTime();
+            if ((cur - seconds) >= 350) {
+                break;
+            }
+        }
+    });
 });
 
 console.log("loaded.");
