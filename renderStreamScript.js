@@ -2,7 +2,7 @@
 "use strict";
 
 //const TICK_INTERVAL = 0.0334;  // milliseconds, frame time, approx: 30fps
-const TICK_INTERVAL = 34;
+const TICK_INTERVAL = 42;
 const URL_SERVER_STREAM = "fetchframe.php";
 const FRAME_END_FLAG = "END FRAME";
 var GLOBAL_STOP_STREAM_FLAG = false;
@@ -25,9 +25,12 @@ class JPEG_Frame {
     get GetFrame() {
         if (this.img === null) {
             this.img = new Image();
-            this.img.src = "data:image/jpg;base64," + this.b64;
+            this.img.src = "data:image/png;base64," + this.b64;
         }
         return this.img;
+    }
+    get GetFrameRaw() {
+        return "data:image/jpg;base64," + this.b64;
     }
     get IsValid() {
         if (this.img === null) {
@@ -77,24 +80,37 @@ class Stream_Queue {
 }
 
 function DrawBuffering(show = true) {
+    //var temp = RenderingCanvas[2].rot;
+    RenderingCanvas[2].rot = 0;
+    RenderingCanvas[1].restore();
     if (show === false) {
-        RenderingCanvas[2].rot = 0;
-        RenderingCanvas[1].restore();
         return 0;
     }
     const imageName = "bufferingImage";
     if (RenderingCanvas[2].imgSrc === null) {
         RenderingCanvas[2].imgSrc = document.getElementById(imageName);
     }
-    var rot = RenderingCanvas[2].rot * Math.PI / 180;
+    /*var lastFrame = GLOBAL_FRAME_QUEUE.GetLastFrame;
+    if (lastFrame !== null) {
+        var c1 = lastFrame.GetFrame.width / 2;
+        var c2 = lastFrame.GetFrame.height / 2;
+        RenderingCanvas[1].drawImage(lastFrame.GetFrame, -c1, -c2);
+    } else {
+        RenderingCanvas[1].fillRect(0, 0, 800, 480);
+    }*/
+    //RenderingCanvas[2].rot = temp;
+    var rot = 0;
+    if (RenderingCanvas[2].rot !== 0) {
+        rot = RenderingCanvas[2].rot * Math.PI / 180;
+    }
     RenderingCanvas[1].rotate(rot);
     var center1 = RenderingCanvas[2].imgSrc.width / 2;
     var center2 = RenderingCanvas[2].imgSrc.height / 2;
     RenderingCanvas[1].drawImage(RenderingCanvas[2].imgSrc, -center1, -center2);
-    RenderingCanvas[2].rot += 1;
-    if (RenderingCanvas[2].rot > 12) {
+    RenderingCanvas[2].rot += 12;
+    /*if (RenderingCanvas[2].rot > 12) {
         RenderingCanvas[2].rot = RenderingCanvas[2].rot - 4;
-    }
+    }*/
 
     return 0;
 }
@@ -111,7 +127,10 @@ function DrawFrame() {
     if (RenderingCanvas[1] === null) {
         RenderingCanvas[1] = RenderingCanvas[0].getContext("2d");
         RenderingCanvas[1].fillRect(0, 0, 800, 480);
-        RenderingCanvas[1].translate(RenderingCanvas[0].width / 2, RenderingCanvas[0].height / 2);
+        var c1 = RenderingCanvas[0].width / 2;
+        var c2 = RenderingCanvas[0].height / 2;
+        console.log(`canvas center point: ${c1} x ${c2}`);
+        RenderingCanvas[1].translate(c1, c2);
         RenderingCanvas[1].save();
     }
     var ctx = RenderingCanvas[1];
@@ -123,9 +142,9 @@ function DrawFrame() {
     DrawBuffering(false);
     var center1 = img.GetFrame.width / 2;
     var center2 = img.GetFrame.height / 2;
+    console.log(`image center: ${center1} x ${center2}`);
     ctx.drawImage(img.GetFrame, -center1, -center2);
     RenderingCanvas[1].save();
-    console.log("drawn.");
 
     return 0;
 }
@@ -144,7 +163,7 @@ function CB_FetchFrame_Pass(resp) {
         /*DrawBuffering();*/
         return 1;
     }
-    console.log(`response length: ${resp.res.length}`);
+    //console.log(`response length: ${resp.res.length}`);
     // frames might be shipped out of order, lets resolve that.
     // sorting twice to arrange each frame and all its segments are in order.
     resp.res.sort((a, b) => a.seg - b.seg);
@@ -219,6 +238,7 @@ function CB_RenderStreamLoop() {
 }
 
 function CB_RenderStream() {
+    console.log("tick.");
     FetchFrame();
     DrawFrame();
     if (GLOBAL_STOP_STREAM_FLAG === false) {
