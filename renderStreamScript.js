@@ -9,6 +9,7 @@ var GLOBAL_STOP_STREAM_FLAG = false;
 var GLOBAL_INTERVAL_HANDLE = null;
 var GLOBAL_IS_FETCHING = false;
 var GLOBAL_FRAME_QUEUE = null;
+var FRAME_FETCH_INDEX = 0;
 // index 0: canvas element, index 1: canvas context, index 2: buffering data storage
 var RenderingCanvas = [null, null, { rot: 0, imgSrc: null }];
 
@@ -17,6 +18,9 @@ class JPEG_Frame {
         this.b64 = encoded;
         this.frameid = frame;
         this.img = null;
+    }
+    get GetFrameID() {
+        return this.frameid;
     }
     get GetFrame() {
         if (this.img === null) {
@@ -55,8 +59,17 @@ class Stream_Queue {
     AddFrame(frame) {
         this.q.push(frame);
     }
+    get LastFrameID() {
+        if (this.q.length === 0) {
+            return -1;
+        }
+        return this.q[this.q.length - 1].GetFrameID;
+    }
     get GetLastFrame() {
-        return this.q[this.q.length - 1]["_"];
+        if (this.q.length === 0) {
+            return null;
+        }
+        return this.q[this.q.length - 1];
     }
     get GetStreamStats() {
         return null;
@@ -112,6 +125,7 @@ function DrawFrame() {
     var center2 = img.GetFrame.height / 2;
     ctx.drawImage(img.GetFrame, -center1, -center2);
     RenderingCanvas[1].save();
+    console.log("drawn.");
 
     return 0;
 }
@@ -130,6 +144,7 @@ function CB_FetchFrame_Pass(resp) {
         /*DrawBuffering();*/
         return 1;
     }
+    console.log(`response length: ${resp.res.length}`);
     // frames might be shipped out of order, lets resolve that.
     // sorting twice to arrange each frame and all its segments are in order.
     resp.res.sort((a, b) => a.seg - b.seg);
@@ -152,7 +167,7 @@ function CB_FetchFrame_Pass(resp) {
             // a safegaurd against placing old frames into the queue.
             // it would be more efficient to skip the entire frame
             // parsing procedure instead of adding this hotfix
-            if (resp.res[i]['_'] > GLOBAL_FRAME_QUEUE.GetLastFrame) {
+            if (resp.res[i]['_'] > GLOBAL_FRAME_QUEUE.LastFrameID) {
                 GLOBAL_FRAME_QUEUE.AddFrame(new JPEG_Frame(frame, resp.res[i]['_']));
             }
             frameCount = 0;
@@ -162,6 +177,8 @@ function CB_FetchFrame_Pass(resp) {
         frameCount++;
         frame += resp.res[i].frm;
     }
+    // set the next fetched frame count to last fetched frame id + 1
+    FRAME_FETCH_INDEX = GLOBAL_FRAME_QUEUE.LastFrameID + 1;
 
     return 0;
 }
@@ -181,7 +198,7 @@ function FetchFrame() {
     jQuery.ajax({
         url: URL_SERVER_STREAM,
         method: 'POST',
-        data: {"p": "none"},
+        data: { "frame": FRAME_FETCH_INDEX },
         dataType: 'JSON',
         success: function (res) {
             GLOBAL_IS_FETCHING = false;
@@ -201,12 +218,22 @@ function CB_RenderStreamLoop() {
     return 0;
 }
 
+function CB_RenderStream() {
+    FetchFrame();
+    DrawFrame();
+    if (GLOBAL_STOP_STREAM_FLAG === false) {
+        setTimeout(CB_RenderStream, TICK_INTERVAL);
+    }
+    //GLOBAL_STOP_STREAM_FLAG = true;
+}
+
 function main(ev) {
     console.log("Stream script started.");
     RenderingCanvas[0] = document.getElementById("renderingCanvas");
     GLOBAL_FRAME_QUEUE = new Stream_Queue();
     // starting to ticking loop
-    GLOBAL_INTERVAL_HANDLE = setInterval(CB_RenderStreamLoop, TICK_INTERVAL);
+    //GLOBAL_INTERVAL_HANDLE = setInterval(CB_RenderStreamLoop, TICK_INTERVAL);
+    setTimeout(CB_RenderStream, 500);
     return 0;
 }
 
@@ -214,6 +241,7 @@ document.addEventListener("DOMContentLoaded", function (ev) {
     main(ev);
     window.addEventListener("beforeunload", function (e) {
         GLOBAL_STOP_STREAM_FLAG = true;
+        clearInterval(GLOBAL_INTERVAL_HANDLE);
         var seconds = new Date().getTime();
         while (GLOBAL_IS_FETCHING) {
             var cur = new Date().getTime();
