@@ -4,14 +4,32 @@
 <head>
     <meta charset="utf-8" />
     <title>RenderStream Test</title>
+    <link rel="stylesheet" href="resources/bootstrap.min.css" type="text/css">
+    <link href="RenderStreamStyle.css" type="text/css" rel="stylesheet" />
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
-    <script src="renderStreamScript.js"></script>
+    <script src="resources/bootstrap.min.js"></script>
+    <script src="dist/RenderStream.js"></script>
 </head>
 <body>
     <div class="renderDiv">
         <p>Stream canvas</p>
-        <img id="bufferingImage" src="resources/buffering.png" hidden/>
+        <img id="bufferingImage" src="resources/icons/loading.png" hidden/>
         <canvas id="renderingCanvas" height="480" width="800" style="border:1px solid #000000;"></canvas>
+        <div class="container StreamControls">
+            <div class="container-fluid d-inline bg-light" style="height: 24px;">
+                <div class="PausePlayBtn">
+                    <img id="pauseBtn" src="resources/icons/pauseIcon.png" />
+                    <img id="playBtn" src="resources/icons/playIcon.png" style="display: none;" />
+                </div>
+                <div class="playbackScroll">
+                    <input type="range" min="1" max="100" value="50" class="slider" id="seekRange">
+                </div>
+                <div class="playbackInfo">
+                    <p id="frameCountInfo">32123/34242</p>
+                    <p id="timeInfo">0:01/1:00</p>
+                </div>
+            </div>
+        </div>
     </div>
 </body>
 </html>

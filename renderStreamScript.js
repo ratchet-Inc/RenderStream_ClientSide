@@ -2,13 +2,14 @@
 "use strict";
 
 //const TICK_INTERVAL = 0.0334;  // milliseconds, frame time, approx: 30fps
-const TICK_INTERVAL = 34;
+const TICK_INTERVAL = 42;
 const URL_SERVER_STREAM = "fetchframe.php";
 const FRAME_END_FLAG = "END FRAME";
 var GLOBAL_STOP_STREAM_FLAG = false;
 var GLOBAL_INTERVAL_HANDLE = null;
 var GLOBAL_IS_FETCHING = false;
 var GLOBAL_FRAME_QUEUE = null;
+var FRAME_FETCH_COUNT = 0;
 // index 0: canvas element, index 1: canvas context, index 2: buffering data storage
 var RenderingCanvas = [null, null, { rot: 0, imgSrc: null }];
 
@@ -21,7 +22,7 @@ class JPEG_Frame {
     get GetFrame() {
         if (this.img === null) {
             this.img = new Image();
-            this.img.src = "data:image/jpg;base64," + this.b64;
+            this.img.src = "data:image/png;base64," + this.b64;
         }
         return this.img;
     }
@@ -154,6 +155,7 @@ function CB_FetchFrame_Pass(resp) {
         frameCount++;
         frame += resp.res[i].frm;
     }
+    FRAME_FETCH_COUNT = resp.res[resp.res.length - 1]['_'];
 
     return 0;
 }
@@ -173,7 +175,7 @@ function FetchFrame() {
     jQuery.ajax({
         url: URL_SERVER_STREAM,
         method: 'POST',
-        data: {"p": "none"},
+        data: { "frame": FRAME_FETCH_COUNT },
         dataType: 'JSON',
         success: function (res) {
             GLOBAL_IS_FETCHING = false;
@@ -198,7 +200,7 @@ function main(ev) {
     RenderingCanvas[0] = document.getElementById("renderingCanvas");
     GLOBAL_FRAME_QUEUE = new Stream_Queue();
     // starting to ticking loop
-    GLOBAL_INTERVAL_HANDLE = setInterval(CB_RenderStreamLoop, TICK_INTERVAL);
+    //GLOBAL_INTERVAL_HANDLE = setInterval(CB_RenderStreamLoop, TICK_INTERVAL);
     return 0;
 }
 
